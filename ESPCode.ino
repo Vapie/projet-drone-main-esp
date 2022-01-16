@@ -14,10 +14,12 @@ bool needToSendStateChange = false;
 String espCurrentChannel = "esp_control";
 #define USE_SERIAL Serial
 
- int myPins[] = {14,15,13};
+ int myPins[] = {12,13,14,15,16,17};
 
 void IRAM_ATTR isr() {
 }
+void pwmfadein(){
+  }
 String lastStatusArraySendedAsString;
 
 //example of eventstring "esp_control/led/14/off"
@@ -25,12 +27,13 @@ String lastStatusArraySendedAsString;
  
 void handleEventString(String eventString)
 {
-  String eventChannelMessage = getValue(eventString,'/', 0);
+  String eventChannelMessage = getValue(eventString,'/', 0); 
   int pinNumber = getValue(eventString,'/', 2).toInt();
   if (eventChannelMessage  == espCurrentChannel)
   {
     USE_SERIAL.printf("channel is ok\n");
     if (getValue(eventString,'/', 3)=="on"){
+      USE_SERIAL.printf("onéla \n");
       digitalWrite(pinNumber,1);
       }
     else{
@@ -56,8 +59,11 @@ String getCurrentStatusAsString()
 
   // add payload (parameters) for the event
   JsonObject param1 = array.createNestedObject();
-  param1["STATE_BUTTON1"] = digitalRead(18);
-  param1["STATE_BUTTON2"] = digitalRead(18);
+  
+  param1["Sun_BUTTON"] = digitalRead(18);
+  param1["Moon_BUTTON"] = digitalRead(19);
+  param1["Fwd_BUTTON"] = digitalRead(21);
+  param1["Hand_BUTTON"] = digitalRead(22);
 
   
   // JSON to String (serializion)
@@ -114,9 +120,9 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
                 payload = (uint8_t *)sptr;
             }
             DynamicJsonDocument doc(1024);
-            DeserializationError error = deserializeJson(doc, payload, length);
-            if(error) {
-                USE_SERIAL.print(F("deserializeJson() failed: "));
+              DeserializationError error = deserializeJson(doc, payload, length);
+              if(error) {
+                  USE_SERIAL.print(F("deserializeJson() failed: "));
                 USE_SERIAL.println(error.c_str());
                 return;
             }
@@ -163,13 +169,31 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
 void setup() {
    
     pinMode(18, INPUT_PULLUP);
+    pinMode(19, INPUT_PULLUP);
+    pinMode(21, INPUT_PULLUP);
+    pinMode(22, INPUT_PULLUP);
+    pinMode(12, OUTPUT);
+    digitalWrite(12,0);
     pinMode(14, OUTPUT);
     digitalWrite(14,0);
     pinMode(13, OUTPUT);
     digitalWrite(13,0);
     pinMode(15, OUTPUT);
     digitalWrite(15,0);
+    pinMode(16, OUTPUT);
+    digitalWrite(16,0);
+    pinMode(17, OUTPUT);
+    digitalWrite(17,0);
+    pinMode(23, OUTPUT);
+    digitalWrite(23,0);
+    pinMode(25, OUTPUT);
+    digitalWrite(25,0);
+    pinMode(26, OUTPUT);
+    digitalWrite(26,0);
     attachInterrupt(18, isr, FALLING);
+    attachInterrupt(19, isr, FALLING);
+    attachInterrupt(21, isr, FALLING);
+    attachInterrupt(22, isr, FALLING);
     
     USE_SERIAL.begin(115200);
 
@@ -182,8 +206,8 @@ void setup() {
           delay(1000);
       }
 
-    WiFiMulti.addAP("Livebox-fd84", "password");
 
+    WiFiMulti.addAP("ssid", "yourpassword");
 
     //WiFi.disconnect();
     while(WiFiMulti.run() != WL_CONNECTED) {
@@ -193,8 +217,8 @@ void setup() {
     String ip = WiFi.localIP().toString();
     USE_SERIAL.printf("[SETUP] WiFi Connected %s\n", ip.c_str());
 
-    socketIO.begin("192.168.1.17", 8080, "/socket.io/?EIO=4");
-
+    //socketIO.begin("192.168.177.1", 8080, "/socket.io/?EIO=4");
+    socketIO.begin("192.168.1.123", 8080, "/socket.io/?EIO=5");
     // event handler
     socketIO.onEvent(socketIOEvent);
     lastStatusArraySendedAsString="";
@@ -212,4 +236,34 @@ void loop() {
         lastStatusArraySendedAsString = currentStatusAsString;
         USE_SERIAL.println(lastStatusArraySendedAsString);
       }
+
+      
+    /*
+     uint64_t now = millis();
+     if(now - messageTimestamp > 2000) {
+        messageTimestamp = now;
+
+        // creat JSON message for Socket.IO (event)
+        DynamicJsonDocument doc(1024);
+        JsonArray array = doc.to<JsonArray>();
+
+        // add evnet name
+        // Hint: socket.on('event_name', ....
+        array.add("photo");
+
+        // add payload (parameters) for the event
+        JsonObject param1 = array.createNestedObject();
+        param1["STATE_BUTTON1"] = digitalRead(18);
+
+        // JSON to String (serializion)
+        String output;
+        serializeJson(doc, output);
+
+        // Send event
+        socketIO.sendEVENT(output);
+
+        // Print JSON for debugging
+        USE_SERIAL.println(output);
+    }
+    */
 }
